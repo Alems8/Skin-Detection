@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import plot_confusion_matrix
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def HaveAlreadyFrames(answer, Framepath=None, MaskPath=None):
@@ -60,32 +61,42 @@ def HaveAlreadyFrames(answer, Framepath=None, MaskPath=None):
     return FrameTitles, MaskTitles
 
 
-def getArrays(titles):
+def getArrays(FrameTitles, MaskTitles):
     width = 320
     height = 240
     t = 0
-    matrix = []
-    for i in range(0, len(titles)):
-        img = PIL.Image.open(titles[i])
-        img = img.resize((width, height))
+    matrixFrame = []
+    matrixMask = []
+
+    for i in range(0, len(MaskTitles)):
+        imgFrame = PIL.Image.open(FrameTitles[i])
+        imgFrame = imgFrame.resize((width, height))
+
+        imgMask = PIL.Image.open(MaskTitles[i])
+        imgMask = imgMask.resize((width, height))
 
         for k in range(0, height):
             for j in range(0, width):
-                matrix.append([])
-                rgb = img.getpixel((j, k))
-                hls = colorsys.rgb_to_hls(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255)
-                if (isinstance(titles[0], float)):
-                    for s in range(0, 3):
-                        matrix[t].append(hls[s])
+                matrixFrame.append([])
+                matrixMask.append([])
+
+                rgbFrame = imgFrame.getpixel((j, k))
+                hlsFrame = colorsys.rgb_to_hls(rgbFrame[0] / 255, rgbFrame[1] / 255, rgbFrame[2] / 255)
+
+                rgbMask = imgMask.getpixel((j, k))
+                hlsMask = colorsys.rgb_to_hls(rgbMask[0] / 255, rgbMask[1] / 255, rgbMask[2] / 255)
+
+                for s in range(0, 3):
+                    matrixFrame[t].append(hlsFrame[s])
+
+                if (hlsMask[1] < 0.1):
+
+                    matrixMask[t].append("Black")
                 else:
-                    if (hls[1] < 0.1):
 
-                        matrix[t].append("Black")
-                    else:
-
-                        matrix[t].append("White")
+                    matrixMask[t].append("White")
                 t += 1
-    return matrix
+    return np.array(matrixFrame), np.array(matrixMask)
 
 
 def compute(InputArray, LabelArray):
@@ -112,33 +123,37 @@ def compute(InputArray, LabelArray):
 
     print(clf.score(X_testscaled, y_test))
 
+    fig = plot_confusion_matrix(clf, X_testscaled, y_test, display_labels=["Black", "White"])
+    fig.figure_.suptitle("Confusion Matrix for Skin Detection")
+    plt.show()
+
     return y_show_1, y_show_2
 
 
-def imageResults(array, i, y):
+def imageResults(array, p, y):
     img = PIL.Image.new("RGBA", (320, 240), (0, 0, 0))
     k = 0
 
     for i in range(0, 240):
         for j in range(0, 320):
             if (y[k] == "White"):
-                img.putpixel((j, i), (255, 255, 255, 0))  # bianco
-    k += 1
+                img.putpixel((j, i), (255, 255, 255, 0))
+            k += 1
 
-    img1 = PIL.Image.open(array[0])
+    img1 = PIL.Image.open(array)
     img1 = img1.resize((320, 240))
     img1.paste(img, (0, 0), mask=img)
     img1.show()
-    img1.save("D:\AI\ExamProject\Results\Skin_Detection_Result{i}.jpg")
+    img1.save("D:\AI\ExamProject\Results\Skin_Detection_Result{p}.jpg")
 
 
 def main():
     FrameTitles, MaskTitles = HaveAlreadyFrames(False)
-    InputArray = np.array(getArrays(FrameTitles))
-    LabelArray = np.array(getArrays(MaskTitles))
+    InputArray, LabelArray = getArrays(FrameTitles, MaskTitles)
+
     y1, y2 = compute(InputArray, LabelArray)
-    imageResults(FrameTitles, 1, y1)
-    imageResults(FrameTitles, 2, y2)
+    imageResults(FrameTitles[1], 1, y1)
+    imageResults(FrameTitles[-1], 2, y2)
 
 
 if __name__ == "__main__":
